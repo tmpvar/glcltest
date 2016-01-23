@@ -55,18 +55,21 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-int gl_error() {
+GLint gl_error() {
   GLint error = glGetError();
-  printf("ERROR: %s, %i\n", (char *)gluErrorString(error), error);
-  return -1;
+  error && printf("ERROR: %s, %i\n", (char *)gluErrorString(error), error);
+  return error;
 }
 
 void gl_shader_log(shader) {
+  GLint error = glGetError();
   GLint l, m;
-  glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
-  char s[m];
-  glGetShaderInfoLog(shader, m, &l, s);
-  printf("shader log:\n%s\n", s);
+  if (error) {
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
+    char s[m];
+    glGetShaderInfoLog(shader, m, &l, s);
+    printf("shader log:\n%s\n", s);
+  }
 }
 
 int main(void) {

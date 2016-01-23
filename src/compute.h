@@ -27,10 +27,12 @@ void cl_print_program_info(glcl_job_t *job) {
   char* log = NULL;
   size_t r = 0;
   clGetProgramBuildInfo(job->program, job->device, CL_PROGRAM_BUILD_LOG, 0, NULL, &r);
-  log = (char*)malloc( r + 1 );
-  cl_int err = clGetProgramBuildInfo(job->program, job->device, CL_PROGRAM_BUILD_LOG, r, log, NULL);
-  printf("kernel build log: %s\n", log);
-  free( log );
+  if (r > 1) {
+    log = (char*)malloc( r + 1 );
+    cl_int err = clGetProgramBuildInfo(job->program, job->device, CL_PROGRAM_BUILD_LOG, r, log, NULL);
+    printf("kernel build log: %s\n", log);
+    free( log );
+  }
 }
 
 
@@ -124,7 +126,7 @@ int compute_init(glcl_job_t *job) {
   // this will not be async if the `pfn_notify` arg is not a callback
   cl_int result = clBuildProgram(job->program, 1, &job->device, NULL, NULL, NULL);
   cl_print_program_info(job);
-  printf("clBuildProgram: %i\n", result);
+  result && printf("clBuildProgram: %i\n", result);
   free(source_str);
 
 
