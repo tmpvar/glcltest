@@ -77,7 +77,6 @@ int main(void) {
   GLint vpos_location;
   glcl_job_t job;
 
-
   glfwSetErrorCallback(error_callback);
 
   if (!glfwInit())
@@ -104,6 +103,10 @@ int main(void) {
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+
+// -- shared texture --
+  compute_init(&job);
+
   GLuint texture = 0;
   unsigned int bwidth = 640, bheight = 480;
   glGenTextures(1, &texture);
@@ -124,9 +127,6 @@ int main(void) {
     0
   );
 
-// -- shared texture --
-  compute_init(&job);
-
   // Create clgl shared texture
   cl_mem fb = clCreateFromGLTexture(
     job.context,
@@ -136,8 +136,6 @@ int main(void) {
     texture,
     NULL
   );
-
-  compute_init(&job);
 
 // -- end shared texture --
 
@@ -166,9 +164,7 @@ int main(void) {
               sizeof(float) * 2, (void*) 0);
 
   // operate on rows in parallel
-  size_t global_item_size = 1;
-  size_t local_item_size = 1; // pixel stride
-
+  size_t threads[2] = { 640, 480 };
   while (!glfwWindowShouldClose(window)) {
 
 // -- compute! --
@@ -179,17 +175,18 @@ int main(void) {
     clEnqueueNDRangeKernel(
       job.command_queue,
       job.kernel,
-      1,
+      2,
       NULL,
-      &global_item_size,
-      &local_item_size,
+      threads,
+      NULL,
       0,
       NULL, // no waitlist
       NULL  // no callback
     );
 
-    clFinish(job.command_queue);
+
     clEnqueueReleaseGLObjects(job.command_queue, 1,  &fb, 0, 0, NULL);
+    clFlush(job.command_queue);
 // -- end compute --
 
     float ratio;

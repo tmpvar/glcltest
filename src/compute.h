@@ -13,6 +13,7 @@
 
 #define MEM_SIZE (128)
 #define MAX_SOURCE_SIZE (0x100000)
+#define CL_CHECK_ERROR(err) do{if (err) {printf("FATAL ERROR %d at " __FILE__ ":%d\n",err,__LINE__); exit(1); } } while(0)
 
 typedef struct {
   cl_device_id device;
@@ -21,6 +22,16 @@ typedef struct {
   cl_program program;
   cl_kernel kernel;
 } glcl_job_t;
+
+void cl_print_program_info(glcl_job_t *job) {
+  char* log = NULL;
+  size_t r = 0;
+  clGetProgramBuildInfo(job->program, job->device, CL_PROGRAM_BUILD_LOG, 0, NULL, &r);
+  log = (char*)malloc( r + 1 );
+  cl_int err = clGetProgramBuildInfo(job->program, job->device, CL_PROGRAM_BUILD_LOG, r, log, NULL);
+  printf("kernel build log: %s\n", log);
+  free( log );
+}
 
 
 int compute_init(glcl_job_t *job) {
@@ -34,6 +45,8 @@ int compute_init(glcl_job_t *job) {
   char *source_str = (char*)malloc(MAX_SOURCE_SIZE);
   size_t source_size = fread(source_str, 1, MAX_SOURCE_SIZE, fp);
   fclose(fp);
+
+  printf("loaded kernel:\n%s\n", source_str);
 
   #ifdef linux
     cl_context_properties properties[] = {
@@ -63,15 +76,43 @@ int compute_init(glcl_job_t *job) {
   cl_uint ret_num_devices;
   cl_uint ret_num_platforms;
   cl_int ret;
+  size_t ret_size;
+  int i;
 
-  clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
-  clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, 1, &job->device, &ret_num_devices);
+  job->context = clCreateContext(properties, 0, 0, 0, 0, 0);
+  if (!job->context) {
+    printf("clCreateContext failed\n");
+  }
 
-  // TODO: error handling and device selection
-  job->context = clCreateContext(properties, 1, &job->device, NULL, NULL, &ret);
+  // compute the number of devices
+  ret = clGetContextInfo(job->context, CL_CONTEXT_DEVICES, 0, NULL, &ret_size);
+  if(!ret_size || ret != CL_SUCCESS) {
+    printf("clGetDeviceInfo failed\n");
+  }
+  ret_num_devices = ret_size/sizeof(cl_device_id);
 
-  /* Create Command Queue */
-  job->command_queue = clCreateCommandQueue(job->context, job->device, 0, &ret);
+  // get the device list
+  cl_device_id devices[ret_num_devices];
+  ret = clGetContextInfo(job->context, CL_CONTEXT_DEVICES, ret_size, devices, &ret_size);
+  if(ret) {
+    printf("clGetContextInfo failed\n");
+  }
+
+  // get the GPU device and queue
+  for(i=0; i<ret_num_devices; i++) {
+    cl_int deviceType, error;
+
+    ret = clGetDeviceInfo(devices[i], CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, &ret_size);
+    if(ret) {
+      printf("clGetDeviceInfo failed\n");
+    }
+
+    if(deviceType == CL_DEVICE_TYPE_GPU) {
+      job->device = devices[i];
+      job->command_queue = clCreateCommandQueue(job->context, job->device, 0, &error);
+      break;
+    }
+  }
 
   /* Create Kernel Program from the source */
   job->program = clCreateProgramWithSource(
@@ -83,11 +124,14 @@ int compute_init(glcl_job_t *job) {
   );
 
   // this will not be async if the `pfn_notify` arg is not a callback
-  clBuildProgram(job->program, 1, &job->device, NULL, NULL, NULL);
+  cl_int result = clBuildProgram(job->program, 1, &job->device, NULL, NULL, NULL);
+  cl_print_program_info(job);
+  printf("clBuildProgram: %i\n", result);
   free(source_str);
 
 
   job->kernel = clCreateKernel(job->program, "hello", &ret);
+  CL_CHECK_ERROR(ret);
 
   return 1;
 }
