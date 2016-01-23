@@ -4,6 +4,10 @@ project(glcltest)
 set(CMAKE_C_FLAGS "-O3 -march=native -msse4.1 -msse4.2 -mavx -g")
 set(CMAKE_CXX_FLAGS "-march=native -msse4.2 -mavx -g")
 
+# find opencl
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
+find_package(OpenCL)
+
 # configure glfw
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
@@ -12,7 +16,8 @@ set(GLFW_INSTALL OFF CACHE BOOL "Build the GLFW installation target")
 add_subdirectory(deps/glfw)
 
 include_directories("${GLFW_SOURCE_DIR}/include"
-                    "${GLFW_SOURCE_DIR}/deps")
+                    "${GLFW_SOURCE_DIR}/deps"
+                    ${OPENCL_INCLUDE_DIRS})
 
 set(GLAD "${GLFW_SOURCE_DIR}/deps/glad/glad.h"
          "${GLFW_SOURCE_DIR}/deps/glad.c")
@@ -29,4 +34,14 @@ target_link_libraries(
     glfw
     ${OPENGL_glu_LIBRARY}
     ${GLFW_LIBRARIES}
+)
+
+add_executable(
+    cltest
+    src/cl.c
+)
+
+target_link_libraries(
+    cltest
+    ${OPENCL_LIBRARIES}
 )
