@@ -34,7 +34,14 @@ target_link_libraries(
     glfw
     ${OPENGL_glu_LIBRARY}
     ${GLFW_LIBRARIES}
+    ${OPENCL_LIBRARIES}
 )
+
+if(APPLE)
+  target_link_libraries(glcltest "-framework OpenGL")
+elseif(UNIX)
+  target_link_libraries(glcltest GL)
+endif()
 
 add_executable(
     cltest
