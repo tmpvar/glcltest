@@ -1,6 +1,11 @@
 __kernel void hello(__write_only image2d_t image) {
-  int x = get_global_id(0);
-  int y = get_global_id(1);
+  int2 pos = (int2)(get_global_id(0), get_global_id(1));
+  float2 fpos = convert_float2(pos);
+  float2 dim = convert_float2(get_image_dim(image));
 
-  write_imagef(image, (int2)(x, y), (float4)(1.0, 0.0, 1.0, 1.0));
+  float2 center = dim/(float2)(2.0);
+  float d = distance(fpos, center);
+
+  // TODO: why is this not centered?
+  write_imagef(image, pos, (float4)(d/200));
 }

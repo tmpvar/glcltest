@@ -46,8 +46,6 @@ int compute_init(glcl_job_t *job) {
   size_t source_size = fread(source_str, 1, MAX_SOURCE_SIZE, fp);
   fclose(fp);
 
-  printf("loaded kernel:\n%s\n", source_str);
-
   #ifdef linux
     cl_context_properties properties[] = {
       CL_GL_CONTEXT_KHR, (cl_context_properties) glXGetCurrentContext(),
