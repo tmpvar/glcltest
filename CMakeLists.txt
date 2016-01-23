@@ -1,0 +1,32 @@
+cmake_minimum_required(VERSION 2.6)
+project(glcltest)
+
+set(CMAKE_C_FLAGS "-O3 -march=native -msse4.1 -msse4.2 -mavx -g")
+set(CMAKE_CXX_FLAGS "-march=native -msse4.2 -mavx -g")
+
+# configure glfw
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW docs")
+set(GLFW_INSTALL OFF CACHE BOOL "Build the GLFW installation target")
+add_subdirectory(deps/glfw)
+
+include_directories("${GLFW_SOURCE_DIR}/include"
+                    "${GLFW_SOURCE_DIR}/deps")
+
+set(GLAD "${GLFW_SOURCE_DIR}/deps/glad/glad.h"
+         "${GLFW_SOURCE_DIR}/deps/glad.c")
+
+add_executable(
+    glcltest
+    src/main.c
+    ${GLFW_LIBRARIES}
+    ${GLAD}
+)
+
+target_link_libraries(
+    glcltest
+    glfw
+    ${OPENGL_glu_LIBRARY}
+    ${GLFW_LIBRARIES}
+)
