@@ -32,9 +32,8 @@ static const char* vertex_shader_text =
 "attribute vec2 vPos;\n"
 "varying vec2 color;\n"
 "varying vec2 pos;\n"
-"void main()\n"
-"{\n"
-"  pos = vPos;\n"
+"void main() {\n"
+"  pos = vPos * 0.5 + 0.5;\n"
 "  gl_Position = vec4(vPos, 0.0, 1.0);\n"
 "  color = (vPos + 1.0) / 2.0;\n"
 "}\n";
@@ -43,9 +42,8 @@ static const char* fragment_shader_text =
 "varying vec2 color;\n"
 "varying vec2 pos;\n"
 "uniform sampler2D tex;\n"
-"void main()\n"
-"{\n"
-"  gl_FragColor = texture2D(tex, pos);\n//vec4(color.x, texture2D(tex, pos).x, texture2D(tex, pos).x, 1.0);\n"
+"void main() {\n"
+"  gl_FragColor = texture2D(tex, pos.xy);\n"
 "}\n";
 
 static void error_callback(int error, const char* description) {
