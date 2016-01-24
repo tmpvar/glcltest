@@ -33,11 +33,11 @@ static const struct
 static struct
 {
   float id, x, y, r;
-} shapes[] =
+} shapes[3] =
 {
   {1.0f, 50.0f, 50.0f, 30.0f},
+  {1.0f, 200.0f, 100.0f, 100.0f},
   {1.0f, 50.0f, 100.0f, 30.0f},
-  {1.0f, 50.0f, 0.0f, 30.0f},
 };
 
 float zero = 0.0f;

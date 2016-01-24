@@ -10,7 +10,7 @@ __kernel void hello(__write_only image2d_t image, __constant float *shapes) {
   float2 fpos = convert_float2(pos);
 
   float d = 100;
-  for (uint i = 0; i<shape_count; i++) {
+  for (uint i = 0; i<=shape_count; i++) {
     uint offset = i*4;
     switch (convert_uint(shapes[offset])) {
       // circle
