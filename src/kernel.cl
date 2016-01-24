@@ -1,16 +1,27 @@
 float circle(float2 fpos, float r);
 
-float circle(float2 fpos, float r) {
-  return length(fpos) - r;
+float circle(float2 p, float r) {
+  return length(p) - r;
 }
 
-__kernel void hello(__write_only image2d_t image) {
+__kernel void hello(__write_only image2d_t image, __constant float *shapes) {
   int2 pos = (int2)(get_global_id(0), get_global_id(1));
+  uint shape_count = get_global_id(2);
   float2 fpos = convert_float2(pos);
-  float2 dim = convert_float2(get_image_dim(image));
 
-  float2 center = dim/(float2)(2.0);
-  float d = circle(fpos - center, 60.0);;
+  float d = 100;
+  for (uint i = 0; i<shape_count; i++) {
+    uint offset = i*4;
+    switch (convert_uint(shapes[offset])) {
+      // circle
+      case 1:
+        d = fmin(d, circle(
+          fpos - (float2)(shapes[offset+1], shapes[offset+2]),
+          shapes[offset+3]
+        ));
+      break;
+    }
+  }
 
   write_imagef(image, pos, (float4)(d));
 }

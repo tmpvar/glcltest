@@ -27,6 +27,22 @@ static const struct
   {  1.0f,  1.0f },
 };
 
+// TODO: shapes that move need to re-upload the buffer...
+
+
+static struct
+{
+  float id, x, y, r;
+} shapes[] =
+{
+  {1.0f, 50.0f, 50.0f, 30.0f},
+  {1.0f, 50.0f, 100.0f, 30.0f},
+  {1.0f, 50.0f, 0.0f, 30.0f},
+};
+
+float zero = 0.0f;
+uint8_t izero = 0;
+
 static const char* vertex_shader_text =
 "uniform mat4 MVP;\n"
 "attribute vec2 vPos;\n"
@@ -192,7 +208,41 @@ int main(void) {
               sizeof(float) * 2, (void*) 0);
 
   // operate on rows in parallel
-  size_t threads[2] = { bwidth, bheight };
+  size_t threads[3] = { bwidth, bheight, sizeof(shapes) / 16};
+
+  // pre-renderloop setup
+
+  // fill the fullscreen quad texture with black
+  size_t fill_origin[3] = { 0, 0, 0 };
+  size_t fill_region[3] = { bwidth, bheight, 1 };
+  uint8_t fill_color[4] = { 0, 0, 0, 255 };
+
+  cl_int fill_fb_result = clEnqueueFillImage(
+    job.command_queue,
+    fb,
+    &fill_color,
+    fill_origin,
+    fill_region,
+    0,
+    NULL,
+    NULL
+  );
+
+  fill_fb_result && printf("fill fb result: %i\n", fill_fb_result);
+
+  // fill the shape buffer with shapes
+  cl_int errcode;
+  cl_mem shape_buffer = clCreateBuffer(
+    job.context,
+    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+    sizeof(shapes),
+    (void *)&shapes,
+    &errcode
+  );
+
+  clFlush(job.command_queue);
+
+
   while (!glfwWindowShouldClose(window)) {
 
 // -- compute! --
@@ -200,10 +250,12 @@ int main(void) {
     clEnqueueAcquireGLObjects(job.command_queue, 1,  &fb, 0, 0, NULL);
 
     clSetKernelArg(job.kernel, 0, sizeof(fb), &fb);
+    clSetKernelArg(job.kernel, 1, sizeof(shape_buffer), &shape_buffer);
+
     clEnqueueNDRangeKernel(
       job.command_queue,
       job.kernel,
-      2,
+      3,
       NULL,
       threads,
       NULL,
@@ -211,7 +263,6 @@ int main(void) {
       NULL, // no waitlist
       NULL  // no callback
     );
-
 
     clEnqueueReleaseGLObjects(job.command_queue, 1,  &fb, 0, 0, NULL);
     clFlush(job.command_queue);
