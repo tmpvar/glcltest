@@ -24,7 +24,7 @@ set(GLAD "${GLFW_SOURCE_DIR}/deps/glad/glad.h"
 
 add_executable(
     glcltest
-    src/main.c
+    src/main.cc
     ${GLFW_LIBRARIES}
     ${GLAD}
 )
@@ -42,13 +42,3 @@ if(APPLE)
 elseif(UNIX)
   target_link_libraries(glcltest GL)
 endif()
-
-add_executable(
-    cltest
-    src/cl.c
-)
-
-target_link_libraries(
-    cltest
-    ${OPENCL_LIBRARIES}
-)

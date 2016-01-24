@@ -102,7 +102,7 @@ GLint gl_error() {
   return error;
 }
 
-void gl_shader_log(shader) {
+void gl_shader_log(GLuint shader) {
   GLint error = glGetError();
   GLint l, m;
   if (error) {
