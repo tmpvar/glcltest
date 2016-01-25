@@ -15,18 +15,35 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW docs")
 set(GLFW_INSTALL OFF CACHE BOOL "Build the GLFW installation target")
 add_subdirectory(deps/glfw)
 
-include_directories("${GLFW_SOURCE_DIR}/include"
-                    "${GLFW_SOURCE_DIR}/deps"
-                    ${OPENCL_INCLUDE_DIRS})
+include_directories(
+    "${CMAKE_SOURCE_DIR}/src"
+    "${GLFW_SOURCE_DIR}/include"
+    "${GLFW_SOURCE_DIR}/deps"
+    ${OPENCL_INCLUDE_DIRS}
+    "deps/imgui"
+)
 
+# glad
 set(GLAD "${GLFW_SOURCE_DIR}/deps/glad/glad.h"
          "${GLFW_SOURCE_DIR}/deps/glad.c")
+
+# imgui
+add_definitions(-DIMGUI_DISABLE_INCLUDE_IMCONFIG_H)
+set(IMGUI
+    "${CMAKE_SOURCE_DIR}/deps/imgui/imgui.cpp"
+    "${CMAKE_SOURCE_DIR}/deps/imgui/imgui_draw.cpp"
+)
+
+# glfw
+# add_definitions(-DGLFW_INCLUDE_NONE)
 
 add_executable(
     glcltest
     src/main.cc
+    src/glfw-imgui.cc
     ${GLFW_LIBRARIES}
     ${GLAD}
+    ${IMGUI}
 )
 
 target_link_libraries(

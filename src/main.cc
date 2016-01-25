@@ -3,7 +3,6 @@
 
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
-#include <OpenGL/glu.h>
 #else
 #include <CL/cl.h>
 #include <GL/glu.h>
@@ -12,7 +11,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "gl.h"
 #include "compute.h"
+#include "glfw-imgui.h"
 
 static const struct
 {
@@ -29,7 +30,6 @@ static const struct
 
 // TODO: shapes that move need to re-upload the buffer...
 
-
 static struct
 {
   float id, x, y, r;
@@ -44,22 +44,21 @@ float zero = 0.0f;
 uint8_t izero = 0;
 
 static const char* vertex_shader_text =
-"uniform mat4 MVP;\n"
-"attribute vec2 vPos;\n"
-"varying vec2 color;\n"
-"varying vec2 pos;\n"
+"#version 330 core\n"
+"in vec2 vPos;\n"
+"out vec2 pos;\n"
 "void main() {\n"
 "  pos = vPos * 0.5 + 0.5;\n"
 "  gl_Position = vec4(vPos, 0.0, 1.0);\n"
-"  color = (vPos + 1.0) / 2.0;\n"
 "}\n";
 
 static const char* fragment_shader_text =
-"varying vec2 color;\n"
-"varying vec2 pos;\n"
+"#version 330 core\n"
 "uniform sampler2D tex;\n"
+"in vec2 pos;\n"
+"out vec4 fragColor;\n"
 "void main() {\n"
-"  gl_FragColor = texture2D(tex, pos.xy);\n"
+"  fragColor = texture(tex, pos.xy);\n"
 "}\n";
 
 static void error_callback(int error, const char* description) {
@@ -67,50 +66,15 @@ static void error_callback(int error, const char* description) {
 }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
-}
-
-GLint gl_error() {
-  GLint error = glGetError();
-
-  switch (error) {
-    case GL_INVALID_ENUM:
-      printf("error (%i): GL_INVALID_ENUM: An unacceptable value is specified for an enumerated argument. The offending command is ignored and has no other side effect than to set the error flag.\n", error);
-    break;
-
-    case GL_INVALID_VALUE:
-      printf("error (%i): GL_INVALID_VALUE: A numeric argument is out of range. The offending command is ignored and has no other side effect than to set the error flag.\n", error);
-    break;
-
-    case GL_INVALID_OPERATION:
-      printf("error (%i): GL_INVALID_OPERATION: The specified operation is not allowed in the current state. The offending command is ignored and has no other side effect than to set the error flag.\n", error);
-    break;
-
-    case GL_STACK_OVERFLOW:
-      printf("error (%i): GL_STACK_OVERFLOW: This command would cause a stack overflow. The offending command is ignored and has no other side effect than to set the error flag.\n", error);
-    break;
-
-    case GL_STACK_UNDERFLOW:
-      printf("error (%i): GL_STACK_UNDERFLOW: This command would cause a stack underflow. The offending command is ignored and has no other side effect than to set the error flag.\n", error);
-    break;
-
-    case GL_OUT_OF_MEMORY:
-      printf("error (%i): GL_OUT_OF_MEMORY: There is not enough memory left to execute the command. The state of the GL is undefined, except for the state of the error flags, after this error is recorded.\n", error);
-    break;
+    return;
   }
-  return error;
-}
 
-void gl_shader_log(GLuint shader) {
-  GLint error = glGetError();
-  GLint l, m;
-  if (error) {
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
-    char s[m];
-    glGetShaderInfoLog(shader, m, &l, s);
-    printf("shader log:\n%s\n", s);
-  }
+  // propagate key events into imgui
+  // TODO: see if there's a way to denote "handled" so we can fall back
+  //       to global key bindings instead
+  glfw_imgui_key_callback(window, key, scancode, action, mods);
 }
 
 int main(void) {
@@ -121,11 +85,15 @@ int main(void) {
 
   glfwSetErrorCallback(error_callback);
 
-  if (!glfwInit())
+  if (!glfwInit()) {
     exit(EXIT_FAILURE);
+  }
 
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  // TODO: only OSX?
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
   window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
   if (!window) {
@@ -133,18 +101,21 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
+  ImVec4 clear_color = ImColor(114, 144, 154);
+  glfw_imgui_init(window, true);
+
   glfwSetKeyCallback(window, key_callback);
 
   glfwMakeContextCurrent(window);
-
   gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+
   glfwSwapInterval(1);
 
   // Create fullscreen quad
   glGenBuffers(1, &vertex_buffer);
+  gl_error();
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
 
 // -- shared texture --
   compute_init(&job);
@@ -199,10 +170,15 @@ int main(void) {
   glAttachShader(program, vertex_shader);
   glAttachShader(program, fragment_shader);
   glLinkProgram(program);
+  gl_error();
 
+  glUseProgram(program);
   vpos_location = glGetAttribLocation(program, "vPos");
   GLint texture_location = glGetUniformLocation(program, "tex");
 
+  GLuint vao = 0;
+  glGenVertexArrays (1, &vao);
+  glBindVertexArray (vao);
   glEnableVertexAttribArray(vpos_location);
   glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
               sizeof(float) * 2, (void*) 0);
@@ -242,9 +218,9 @@ int main(void) {
 
   clFlush(job.command_queue);
 
-
   while (!glfwWindowShouldClose(window)) {
-
+    glfw_imgui_new_frame();
+    // return 1;
 // -- compute! --
     glFinish();
     clEnqueueAcquireGLObjects(job.command_queue, 1,  &fb, 0, 0, NULL);
@@ -284,6 +260,17 @@ int main(void) {
     glUniform1i(texture_location, 0);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    {
+        static float f = 0.0f;
+        ImGui::Text(
+          "%.3f ms @ (%.1f FPS)",
+          1000.0f / ImGui::GetIO().Framerate,
+          ImGui::GetIO().Framerate
+        );
+    }
+
+    ImGui::Render();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
