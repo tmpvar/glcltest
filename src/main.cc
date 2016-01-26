@@ -30,15 +30,11 @@ static const struct
 
 // TODO: shapes that move need to re-upload the buffer...
 
+#define MAX_SHAPES 10
 static struct
 {
   float id, x, y, r;
-} shapes[3] =
-{
-  {1.0f, 50.0f, 50.0f, 30.0f},
-  {1.0f, 200.0f, 100.0f, 100.0f},
-  {1.0f, 50.0f, 100.0f, 30.0f},
-};
+} shapes[MAX_SHAPES];
 
 float zero = 0.0f;
 uint8_t izero = 0;
@@ -82,6 +78,13 @@ int main(void) {
   GLuint vertex_buffer, vertex_shader, fragment_shader, program;
   GLint vpos_location;
   glcl_job_t job;
+
+  for (float i=0; i<MAX_SHAPES; i++) {
+    shapes[(int)i].id = 1.0f;
+    shapes[(int)i].x = 25.0f * i;
+    shapes[(int)i].y = 100.0f;
+    shapes[(int)i].r = 10.0f * i;
+  }
 
   glfwSetErrorCallback(error_callback);
 
@@ -184,7 +187,7 @@ int main(void) {
               sizeof(float) * 2, (void*) 0);
 
   // operate on rows in parallel
-  size_t threads[3] = { bwidth, bheight, sizeof(shapes) / 16};
+  size_t global_threads[3] = { bwidth, bheight, 0 };
 
   // pre-renderloop setup
 
@@ -218,22 +221,24 @@ int main(void) {
 
   clFlush(job.command_queue);
 
+  cl_uint shape_count = MAX_SHAPES;
+  clSetKernelArg(job.kernel, 0, sizeof(fb), &fb);
+  clSetKernelArg(job.kernel, 1, sizeof(shape_buffer), &shape_buffer);
+  clSetKernelArg(job.kernel, 2, sizeof(cl_uint), &shape_count);
+
   while (!glfwWindowShouldClose(window)) {
     glfw_imgui_new_frame();
-    // return 1;
+
 // -- compute! --
     glFinish();
     clEnqueueAcquireGLObjects(job.command_queue, 1,  &fb, 0, 0, NULL);
 
-    clSetKernelArg(job.kernel, 0, sizeof(fb), &fb);
-    clSetKernelArg(job.kernel, 1, sizeof(shape_buffer), &shape_buffer);
-
     clEnqueueNDRangeKernel(
       job.command_queue,
       job.kernel,
-      3,
+      2,
       NULL,
-      threads,
+      global_threads,
       NULL,
       0,
       NULL, // no waitlist
@@ -267,6 +272,10 @@ int main(void) {
           "%.3f ms @ (%.1f FPS)",
           1000.0f / ImGui::GetIO().Framerate,
           ImGui::GetIO().Framerate
+        );
+        ImGui::Text(
+          "shape count: %u",
+          shape_count
         );
     }
 

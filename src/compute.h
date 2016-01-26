@@ -35,6 +35,80 @@ void cl_print_program_info(glcl_job_t *job) {
   }
 }
 
+void cl_print_device_info_string(cl_device_id device, cl_int type, const char *fmt) {
+  size_t len;
+  clGetDeviceInfo(device, type, 0, NULL, &len);
+  char *value = (char*) malloc(len);
+  clGetDeviceInfo(device, type, len, value, NULL);
+  printf(fmt, value);
+  printf("\n");
+  free(value);
+}
+
+void cl_print_device_extensions(cl_device_id device) {
+  size_t len, last = 0;
+  clGetDeviceInfo(device, CL_DEVICE_EXTENSIONS, 0, NULL, &len);
+  char *value = (char*) malloc(len);
+  clGetDeviceInfo(device, CL_DEVICE_EXTENSIONS, len, value, NULL);
+
+  printf("  extensions:\n");
+
+  for (size_t i=0; i<len; i++) {
+    if (value[i] == ' ') {
+      value[i] = 0;
+      printf("    %s\n", &value[last]);
+      last = i+1;
+    }
+  }
+  free(value);
+}
+
+
+void cl_print_device_info(cl_device_id d) {
+  cl_print_device_info_string(d, CL_DEVICE_NAME, "%s");
+
+  cl_print_device_extensions(d);
+
+  size_t tmp;
+  cl_uint tuint;
+  cl_ulong tulong;
+
+
+  clGetDeviceInfo(d, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(tuint), &tuint, NULL);
+  printf("  compute units: %u\n", tuint);
+
+  clGetDeviceInfo(d, CL_DEVICE_MAX_CONSTANT_ARGS, sizeof(tuint), &tuint, NULL);
+  printf("  max const args: %u\n", tuint);
+
+  clGetDeviceInfo(d, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(tulong), &tulong, NULL);
+  printf("  max const buffer size: %llu\n", tulong);
+
+  clGetDeviceInfo(d, CL_DEVICE_MAX_SAMPLERS, sizeof(tulong), &tulong, NULL);
+  printf("  max samplers: %llu\n", tulong);
+
+
+  // workgroup stuff
+  clGetDeviceInfo(d, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(tmp), &tmp, NULL);
+  printf("  max workgroup size: %lu\n", tmp);
+
+  clGetDeviceInfo(d, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(tuint), &tuint, NULL);
+  printf("  max work item dimensions: %u\n", tuint);
+
+
+  // 2d image max dimensions
+  clGetDeviceInfo(d, CL_DEVICE_IMAGE2D_MAX_HEIGHT, sizeof(tmp), &tmp, NULL);
+  printf("  image2d max: %lu", tmp);
+  clGetDeviceInfo(d, CL_DEVICE_IMAGE2D_MAX_WIDTH, sizeof(tmp), &tmp, NULL);
+  printf(" x %lu\n", tmp);
+
+  // 3d image max dimensions
+  clGetDeviceInfo(d, CL_DEVICE_IMAGE3D_MAX_HEIGHT, sizeof(tmp), &tmp, NULL);
+  printf("  image3d max: %lu", tmp);
+  clGetDeviceInfo(d, CL_DEVICE_IMAGE3D_MAX_WIDTH, sizeof(tmp), &tmp, NULL);
+  printf(" x %lu", tmp);
+  clGetDeviceInfo(d, CL_DEVICE_IMAGE3D_MAX_DEPTH, sizeof(tmp), &tmp, NULL);
+  printf(" x %lu\n", tmp);
+}
 
 int compute_init(glcl_job_t *job) {
   char fileName[] = "../src/kernel.cl";
@@ -113,6 +187,8 @@ int compute_init(glcl_job_t *job) {
       break;
     }
   }
+
+  cl_print_device_info(job->device);
 
   /* Create Kernel Program from the source */
   job->program = clCreateProgramWithSource(
