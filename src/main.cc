@@ -73,11 +73,60 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
   glfw_imgui_key_callback(window, key, scancode, action, mods);
 }
 
+cl_mem fb;
+GLuint fb_texture = 0;
+int has_texture = 0;
+size_t global_threads[2];
+glcl_job_t job;
+int bwidth, bheight;
+
+void resize(GLFWwindow *window, int width, int height) {
+  glfwGetFramebufferSize(window, &bwidth, &bheight);
+
+  // operate on rows in parallel
+  global_threads[0] = bwidth;
+  global_threads[1] = bheight;
+
+  if (!has_texture) {
+    glGenTextures(1, &fb_texture);
+  }
+
+  glBindTexture(GL_TEXTURE_2D, fb_texture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexImage2D(
+    GL_TEXTURE_2D,
+    0,
+    GL_RGBA8,
+    bwidth,
+    bheight,
+    0,
+    GL_RGBA,
+    GL_UNSIGNED_BYTE,
+    0
+  );
+
+  if (!has_texture) {
+    // Create clgl shared texture
+    fb = clCreateFromGLTexture(
+      job.context,
+      CL_MEM_WRITE_ONLY,
+      GL_TEXTURE_2D,
+      0,
+      fb_texture,
+      NULL
+    );
+
+    has_texture = 1;
+  }
+}
+
 int main(void) {
   GLFWwindow* window;
   GLuint vertex_buffer, vertex_shader, fragment_shader, program;
   GLint vpos_location;
-  glcl_job_t job;
 
   for (float i=0; i<MAX_SHAPES; i++) {
     shapes[(int)i].id = 1.0f;
@@ -104,6 +153,9 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
+  glfwSetWindowSizeCallback(window, resize);
+
+
   ImVec4 clear_color = ImColor(114, 144, 154);
   glfw_imgui_init(window, true);
 
@@ -122,38 +174,8 @@ int main(void) {
 
 // -- shared texture --
   compute_init(&job);
-
-  GLuint texture = 0;
-  int bwidth, bheight;
-
   glfwGetFramebufferSize(window, &bwidth, &bheight);
-  glGenTextures(1, &texture);
-  glBindTexture(GL_TEXTURE_2D, texture);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(
-    GL_TEXTURE_2D,
-    0,
-    GL_RGBA8,
-    bwidth,
-    bheight,
-    0,
-    GL_RGBA,
-    GL_UNSIGNED_BYTE,
-    0
-  );
-
-  // Create clgl shared texture
-  cl_mem fb = clCreateFromGLTexture(
-    job.context,
-    CL_MEM_WRITE_ONLY,
-    GL_TEXTURE_2D,
-    0,
-    texture,
-    NULL
-  );
+  resize(window, bwidth, bheight);
 
 // -- end shared texture --
 
@@ -186,28 +208,6 @@ int main(void) {
   glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
               sizeof(float) * 2, (void*) 0);
 
-  // operate on rows in parallel
-  size_t global_threads[3] = { bwidth, bheight, 0 };
-
-  // pre-renderloop setup
-
-  // fill the fullscreen quad texture with black
-  size_t fill_origin[3] = { 0, 0, 0 };
-  size_t fill_region[3] = { bwidth, bheight, 1 };
-  uint8_t fill_color[4] = { 0, 0, 0, 255 };
-
-  cl_int fill_fb_result = clEnqueueFillImage(
-    job.command_queue,
-    fb,
-    &fill_color,
-    fill_origin,
-    fill_region,
-    0,
-    NULL,
-    NULL
-  );
-
-  fill_fb_result && printf("fill fb result: %i\n", fill_fb_result);
 
   // fill the shape buffer with shapes
   cl_int errcode;
@@ -261,7 +261,7 @@ int main(void) {
     glUseProgram(program);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, fb_texture);
     glUniform1i(texture_location, 0);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
