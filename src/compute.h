@@ -86,6 +86,9 @@ void cl_print_device_info(cl_device_id d) {
   clGetDeviceInfo(d, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(tulong), &tulong, NULL);
   printf("  max allocation size: %llu\n", tulong);
 
+  clGetDeviceInfo(d, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(tulong), &tulong, NULL);
+  printf("  local mem size: %llu\n", tulong);
+
   clGetDeviceInfo(d, CL_DEVICE_MAX_SAMPLERS, sizeof(tulong), &tulong, NULL);
   printf("  max samplers: %llu\n", tulong);
 
