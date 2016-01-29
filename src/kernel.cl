@@ -1,6 +1,19 @@
 #define ival float2
 #define ivec2 float4
 
+static float4 hsl(float h, float s, float l) {
+  float3 rgb = clamp(
+    fabs(fmod((float3)(h * 6.0) + (float3)(0.0, 4.0, 2.0), 6.0) - (float3)(3.0)) - (float3)(1.0),
+    (float3)(0.0),
+    (float3)(1.0)
+  );
+
+  return (float4)(
+    l + s * (rgb - (float3)(0.5)) * (float3)(1.0 - fabs(2.0 * l - 1.0)),
+    1.0
+  );
+}
+
 // 1d interval arithmetic
 
 static ival isqr(ival i) {
