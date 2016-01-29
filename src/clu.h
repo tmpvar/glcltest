@@ -57,6 +57,11 @@
     free(value);
   }
 
+  void cl_print_max_allocation_size(cl_device_id d) {
+    cl_ulong tulong;
+    clGetDeviceInfo(d, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(tulong), &tulong, NULL);
+    printf("  max allocation size: %llu\n", tulong);
+  }
 
   void cl_print_device_info(cl_device_id d) {
     cl_print_device_info_string(d, CL_DEVICE_NAME, "%s");
@@ -67,18 +72,22 @@
     cl_uint tuint;
     cl_ulong tulong;
 
-
     clGetDeviceInfo(d, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(tuint), &tuint, NULL);
     printf("  compute units: %u\n", tuint);
 
     clGetDeviceInfo(d, CL_DEVICE_MAX_CONSTANT_ARGS, sizeof(tuint), &tuint, NULL);
     printf("  max const args: %u\n", tuint);
 
+    clGetDeviceInfo(d, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, sizeof(tuint), &tuint, NULL);
+    printf("  global cacheline size: %u\n", tuint);
+
+    clGetDeviceInfo(d, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, sizeof(tulong), &tulong, NULL);
+    printf("  global cache size: %llu\n", tulong);
+
     clGetDeviceInfo(d, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(tulong), &tulong, NULL);
     printf("  max const buffer size: %llu\n", tulong);
 
-    clGetDeviceInfo(d, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(tulong), &tulong, NULL);
-    printf("  max allocation size: %llu\n", tulong);
+    cl_print_max_allocation_size(d);
 
     clGetDeviceInfo(d, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(tulong), &tulong, NULL);
     printf("  local mem size: %llu\n", tulong);
@@ -86,14 +95,12 @@
     clGetDeviceInfo(d, CL_DEVICE_MAX_SAMPLERS, sizeof(tulong), &tulong, NULL);
     printf("  max samplers: %llu\n", tulong);
 
-
     // workgroup stuff
     clGetDeviceInfo(d, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(tmp), &tmp, NULL);
     printf("  max workgroup size: %lu\n", tmp);
 
     clGetDeviceInfo(d, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(tuint), &tuint, NULL);
     printf("  max work item dimensions: %u\n", tuint);
-
 
     // 2d image max dimensions
     clGetDeviceInfo(d, CL_DEVICE_IMAGE2D_MAX_HEIGHT, sizeof(tmp), &tmp, NULL);
@@ -115,7 +122,7 @@
     *program = clCreateProgramWithSource(
       context,
       1,
-      (const char **)&source_str,
+      &source_str,
       (const size_t *)&source_size,
       &ret
     );
@@ -141,5 +148,4 @@
     free(source_str);
     return r;
   }
-
 #endif
