@@ -57,7 +57,6 @@ static ival icircle(ivec2 p, float r) {
   return isub(iv2length(p), r);
 }
 
-
 __kernel void block(__write_only image2d_t image, global float *shapes, uint shape_count, int block_width, int block_height) {
   int2 pos = (int2)(get_global_id(0) * block_width, get_global_id(1) * block_height);
   float2 fpos = convert_float2(pos);
