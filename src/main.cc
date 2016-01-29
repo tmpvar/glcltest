@@ -30,7 +30,7 @@ static const struct
 
 // TODO: shapes that move need to re-upload the buffer...
 
-#define MAX_SHAPES 10
+#define MAX_SHAPES 100
 static struct
 {
   float id, x, y, r;
@@ -130,7 +130,7 @@ int main(void) {
 
   for (float i=0; i<MAX_SHAPES; i++) {
     shapes[(int)i].id = 1.0f;
-    shapes[(int)i].x = 25.0f * i;
+    shapes[(int)i].x = (i - 1) * 5.0f * i;
     shapes[(int)i].y = 100.0f;
     shapes[(int)i].r = 10.0f * i;
   }
