@@ -212,7 +212,7 @@ int compute_init(glcl_job_t *job) {
   free(source_str);
 
 
-  job->kernel = clCreateKernel(job->program, "hello", &ret);
+  job->kernel = clCreateKernel(job->program, "block", &ret);
   CL_CHECK_ERROR(ret);
 
   return 1;

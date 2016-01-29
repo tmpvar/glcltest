@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <math.h>
 
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
@@ -83,9 +84,15 @@ int bwidth, bheight;
 void resize(GLFWwindow *window, int width, int height) {
   glfwGetFramebufferSize(window, &bwidth, &bheight);
 
-  // operate on rows in parallel
-  global_threads[0] = bwidth;
-  global_threads[1] = bheight;
+  cl_int block_width = 20;
+  cl_int block_height = 20;
+
+  global_threads[0] = ceil((float)bwidth / (float)block_width);
+  global_threads[1] = ceil((float)bheight / (float)block_height);
+
+
+  clSetKernelArg(job.kernel, 3, sizeof(cl_int), &block_width);
+  clSetKernelArg(job.kernel, 4, sizeof(cl_int), &block_height);
 
   if (!has_texture) {
     glGenTextures(1, &fb_texture);
@@ -121,6 +128,24 @@ void resize(GLFWwindow *window, int width, int height) {
 
     has_texture = 1;
   }
+
+  // fill the image with black
+  size_t fill_origin[3] = { 0, 0, 0 };
+  size_t fill_region[3] = { bwidth, bheight, 1 };
+  uint8_t fill_color[4] = { 0, 0, 0, 255 };
+
+  cl_int fill_fb_result = clEnqueueFillImage(
+    job.command_queue,
+    fb,
+    &fill_color,
+    fill_origin,
+    fill_region,
+    0,
+    NULL,
+    NULL
+  );
+
+
 }
 
 int main(void) {
@@ -154,7 +179,6 @@ int main(void) {
   }
 
   glfwSetWindowSizeCallback(window, resize);
-
 
   ImVec4 clear_color = ImColor(114, 144, 154);
   glfw_imgui_init(window, true);
@@ -208,7 +232,6 @@ int main(void) {
   glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
               sizeof(float) * 2, (void*) 0);
 
-
   // fill the shape buffer with shapes
   cl_int errcode;
   cl_mem shape_buffer = clCreateBuffer(
@@ -218,6 +241,9 @@ int main(void) {
     (void *)&shapes,
     &errcode
   );
+
+  CL_CHECK_ERROR(errcode);
+
 
   clFlush(job.command_queue);
 
