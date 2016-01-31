@@ -13,9 +13,11 @@
     #include <CL/cl.h>
   #endif
 
+  #include "cl_error.h"
+
   #define MEM_SIZE (128)
   #define MAX_SOURCE_SIZE (0x100000)
-  #define CL_CHECK_ERROR(err) do{if (err) {printf("FATAL ERROR %d at " __FILE__ ":%d\n",err,__LINE__); exit(1); } } while(0)
+  #define CL_CHECK_ERROR(err) do{if (err) {printf("FATAL ERROR %d at " __FILE__ ":%d\n",err,__LINE__); cl_error(err); exit(1); } } while(0)
 
   void cl_print_program_info(cl_device_id device, cl_program program) {
     char* log = NULL;
