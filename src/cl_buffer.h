@@ -24,6 +24,10 @@ namespace cl {
       this->init(context, flags | CL_MEM_COPY_HOST_PTR, length, data);
     }
 
+    Buffer<T>(cl_context context, size_t length, T *data) {
+      this->init(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, length, data);
+    }
+
     void init(cl_context context, cl_mem_flags flags, size_t length, T *data = NULL) {
       this->context = context;
       this->length = length;
@@ -38,6 +42,10 @@ namespace cl {
         data,
         &ret
       );
+
+      if (ret) {
+        printf("failed to allocate %lu bytes\n", this->byte_length);
+      }
 
       CL_CHECK_ERROR(ret);
     }
