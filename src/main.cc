@@ -15,20 +15,12 @@
 #include "gl.h"
 #include "compute.h"
 #include "glfw-imgui.h"
+#include "mouse.h"
+#include "orbit-camera.h"
 
-static const struct
-{
-  float x, y;
-} vertices[6] =
-{
-  { -1.0f,  1.0f },
-  {  1.0f,  1.0f },
-  { -1.0f, -1.0f },
-  {  1.0f, -1.0f },
-  { -1.0f, -1.0f },
-  {  1.0f,  1.0f },
-};
-
+// Phases
+#include "phase_raster_obb.h"
+#include "phase_output.h"
 // TODO: shapes that move need to re-upload the buffer...
 
 #define MAX_SHAPES 100
@@ -39,24 +31,6 @@ static struct
 
 float zero = 0.0f;
 uint8_t izero = 0;
-
-static const char* vertex_shader_text =
-"#version 330 core\n"
-"in vec2 vPos;\n"
-"out vec2 pos;\n"
-"void main() {\n"
-"  pos = vPos * 0.5 + 0.5;\n"
-"  gl_Position = vec4(vPos, 0.0, 1.0);\n"
-"}\n";
-
-static const char* fragment_shader_text =
-"#version 330 core\n"
-"uniform sampler2D tex;\n"
-"in vec2 pos;\n"
-"out vec4 fragColor;\n"
-"void main() {\n"
-"  fragColor = texture(tex, pos.xy);\n"
-"}\n";
 
 static void error_callback(int error, const char* description) {
   fprintf(stderr, "Error: %s\n", description);
@@ -74,9 +48,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
   glfw_imgui_key_callback(window, key, scancode, action, mods);
 }
 
+
 cl_mem fb;
-GLuint fb_texture = 0;
-int has_texture = 0;
 size_t global_threads[2];
 glcl_job_t job;
 int bwidth, bheight;
@@ -90,43 +63,24 @@ void resize(GLFWwindow *window, int width, int height) {
   global_threads[0] = ceil((float)bwidth / (float)block_width);
   global_threads[1] = ceil((float)bheight / (float)block_height);
 
-
   clSetKernelArg(job.kernel, 3, sizeof(cl_int), &block_width);
   clSetKernelArg(job.kernel, 4, sizeof(cl_int), &block_height);
 
-  if (!has_texture) {
-    glGenTextures(1, &fb_texture);
-  }
-
-  glBindTexture(GL_TEXTURE_2D, fb_texture);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(
-    GL_TEXTURE_2D,
-    0,
-    GL_RGBA8,
-    bwidth,
-    bheight,
-    0,
-    GL_RGBA,
-    GL_UNSIGNED_BYTE,
-    0
-  );
+  int has_texture = phase_output_resize(bwidth, bheight);
 
   if (!has_texture) {
+    cl_int shared_texture_error;
     // Create clgl shared texture
     fb = clCreateFromGLTexture(
       job.context,
       CL_MEM_WRITE_ONLY,
       GL_TEXTURE_2D,
       0,
-      fb_texture,
-      NULL
+      phase_output_get_fb(),
+      &shared_texture_error
     );
 
-    has_texture = 1;
+    CL_CHECK_ERROR(shared_texture_error);
   }
 
   // fill the image with black
@@ -144,8 +98,10 @@ void resize(GLFWwindow *window, int width, int height) {
     NULL,
     NULL
   );
+}
 
-
+void vec3_print(const vec3 v) {
+  printf("(%f, %f, %f)\n", v[0], v[1], v[2]);
 }
 
 int main(void) {
@@ -166,13 +122,19 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
+  // setup orbit camera
+  vec3 eye = vec3_create(0.0f, 0.0f, -5);
+  vec3 center = vec3f(0.0f);
+  vec3 up = vec3_create(0.0, 1.0, 0.0 );
+  orbit_camera_init(eye, center, up);
+
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   // TODO: only OSX?
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-  window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
+  window = glfwCreateWindow(640, 480, "gogo", NULL, NULL);
   if (!window) {
     glfwTerminate();
     exit(EXIT_FAILURE);
@@ -184,17 +146,12 @@ int main(void) {
   glfw_imgui_init(window, true);
 
   glfwSetKeyCallback(window, key_callback);
-
+  glfwSetMouseButtonCallback(window, mouse_button_callback);
+  glfwSetCursorPosCallback(window, mouse_move_callback);
   glfwMakeContextCurrent(window);
   gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
   glfwSwapInterval(1);
-
-  // Create fullscreen quad
-  glGenBuffers(1, &vertex_buffer);
-  gl_error();
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 // -- shared texture --
   compute_init(&job);
@@ -202,35 +159,6 @@ int main(void) {
   resize(window, bwidth, bheight);
 
 // -- end shared texture --
-
-  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
-  gl_error();
-  glCompileShader(vertex_shader);
-  gl_shader_log(vertex_shader);
-  gl_error();
-
-  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
-  glCompileShader(fragment_shader);
-  gl_shader_log(fragment_shader);
-
-  program = glCreateProgram();
-  glAttachShader(program, vertex_shader);
-  glAttachShader(program, fragment_shader);
-  glLinkProgram(program);
-  gl_error();
-
-  glUseProgram(program);
-  vpos_location = glGetAttribLocation(program, "vPos");
-  GLint texture_location = glGetUniformLocation(program, "tex");
-
-  GLuint vao = 0;
-  glGenVertexArrays (1, &vao);
-  glBindVertexArray (vao);
-  glEnableVertexAttribArray(vpos_location);
-  glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
-              sizeof(float) * 2, (void*) 0);
 
   // fill the shape buffer with shapes
   cl_int errcode;
@@ -252,8 +180,27 @@ int main(void) {
   clSetKernelArg(job.kernel, 1, sizeof(shape_buffer), &shape_buffer);
   clSetKernelArg(job.kernel, 2, sizeof(cl_uint), &shape_count);
 
+  phase_raster_obb_init();
+  phase_output_init();
+
   while (!glfwWindowShouldClose(window)) {
     glfw_imgui_new_frame();
+
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+      orbit_camera_rotate(0, 0, -.1, 0);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+      orbit_camera_rotate(0, 0, .1, 0);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      orbit_camera_rotate(0, 0, 0, .1);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      orbit_camera_rotate(0, 0, 0, -.1);
+    }
 
 // -- compute! --
     glFinish();
@@ -284,13 +231,22 @@ int main(void) {
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(program);
+    // compute MVP matrix
+    mat4 projection;
+    mat4_perspective(
+      projection,
+      M_PI/4.0,
+      (float)width/(float)height,
+      0.1,
+      1000.0
+    );
+    mat4 view, mvp;
+    orbit_camera_view(view);
+    vec3 ro = mat4_get_eye(view);
+    mat4_mul(mvp, projection, view);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, fb_texture);
-    glUniform1i(texture_location, 0);
-
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    phase_output_render();
+    phase_raster_obb_render(mvp);
 
     {
         static float f = 0.0f;
