@@ -3,35 +3,59 @@
 
   // #include "scene.h"
 
-  static const struct
-  {
-    float x, y;
-  } phase_raster_obb_vertices[6] =
-  {
-    { -1.0f,  1.0f },
-    {  1.0f,  1.0f },
-    { -1.0f, -1.0f },
-    {  1.0f, -1.0f },
-    { -1.0f, -1.0f },
-    {  1.0f,  1.0f },
+  float phase_raster_obb_vertices[108] = {
+     1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f
   };
 
   static const char* phase_raster_obb_vertex_shader_text =
   "#version 330 core\n"
-  "in vec2 vPos;\n"
+  "in vec3 vPos;\n"
   "uniform mat4 mvp;"
-  "out vec2 pos;\n"
   "void main() {\n"
-  "  gl_Position = mvp * vec4(vPos, 0.0, 1.0);\n"
+  "  gl_Position = mvp * vec4(vPos, 1.0);\n"
   "}\n";
 
   static const char* phase_raster_obb_fragment_shader_text =
   "#version 330 core\n"
   "uniform sampler2D tex;\n"
-  "in vec2 pos;\n"
   "out vec4 fragColor;\n"
   "void main() {\n"
-  "  fragColor = vec4(1.0);\n"
+  "  fragColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
   "}\n";
 
   struct {
@@ -79,6 +103,8 @@
   }
 
   void phase_raster_obb_render(mat4 mvp/*scene_t *scene, mat4 mvp*/) {
+    glBindVertexArray (phase_raster_obb.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, phase_raster_obb.vertex_buffer);
 
     glUseProgram(phase_raster_obb.program);
     GLint vpos_location = glGetAttribLocation(phase_raster_obb.program, "vPos");
@@ -87,15 +113,16 @@
     glEnableVertexAttribArray(vpos_location);
     glVertexAttribPointer(
       vpos_location,
-      2,
+      3,
       GL_FLOAT,
       GL_FALSE,
-      sizeof(float) * 2,
+      0,
       (void*) 0
     );
 
     GLuint mvpid = glGetUniformLocation(phase_raster_obb.program, "mvp");
     glUniformMatrix4fv(mvpid, 1, GL_FALSE, mvp);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    gl_error();
   }
 #endif

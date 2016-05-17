@@ -121,6 +121,8 @@
 
   void phase_output_render() {
     glUseProgram(phase_output.program);
+    glBindVertexArray (phase_output.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, phase_output.vertex_buffer);
 
     GLint vpos_location = glGetAttribLocation(phase_output.program, "vPos");
     GLint texture_location = glGetUniformLocation(phase_output.program, "tex");
